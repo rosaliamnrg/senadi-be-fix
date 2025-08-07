@@ -24,6 +24,10 @@ from uuid import uuid4
 import psycopg2
 import psycopg2.extras
 import threading
+import pytz
+
+indonesia_tz = pytz.timezone("Asia/Jakarta")
+now_wib = datetime.now(indonesia_tz)
 
 # LangChain imports
 from langchain.chains import RetrievalQA
@@ -1020,7 +1024,7 @@ def create_chat():
         
         # if 'created_at' in column_names and 'DEFAULT' not in [col.get('Extra', '').upper() for col in columns if col['Field'] == 'created_at']:
         insert_columns.append('created_at')
-        insert_values.append(datetime.now())
+        insert_values.append(now_wib)
     
         # Construct the query dynamically
         placeholders = ', '.join(['%s'] * len(insert_values))
@@ -1105,7 +1109,7 @@ def chat(chat_id):
         try:
             cursor.execute(
                 "INSERT INTO messages (chat_id, message, sender, created_at) VALUES (%s, %s, %s, %s)",
-                (chat_id, content, 'user', datetime.now())
+                (chat_id, content, 'user', now_wib)
             )
             conn.commit()
         except Exception as e:
@@ -1270,7 +1274,7 @@ def chat(chat_id):
         try:
             cursor.execute(
                 "INSERT INTO messages (chat_id, message, sender, is_from_corrected, created_at) VALUES (%s, %s, %s, %s, %s)",
-                (chat_id, bot_response, 'bot', is_from_correction, datetime.now())
+                (chat_id, bot_response, 'bot', is_from_correction, now_wib)
             )
             conn.commit()
             
@@ -1347,7 +1351,7 @@ def verify_chat(chat_id):
             return jsonify({"error": "Chat not found"}), 404
         
         # Update chat verification status
-        current_time = datetime.now()
+        current_time = now_wib
         cursor.execute(
             "UPDATE chats SET verified = TRUE, verified_at = %s, verified_by = %s WHERE id = %s",
             (current_time, user_id, chat_id)
@@ -2095,7 +2099,7 @@ def upload_file_github():
             #     )
             cursor.execute(
                 "INSERT INTO knowledge_files (filename, file_type, uploaded_by, upload_date) VALUES (%s, %s, %s, %s)",
-                (filename, file_type, user_name, datetime.now(), )
+                (filename, file_type, user_name, now_wib, )
             )
             conn.commit()
             print("Sukses masuk ke Supabase")
@@ -2336,17 +2340,25 @@ def correct_message(message_id):
         
         # Sederhanakan proses dengan INSERT tanpa menggunakan custom UUID - gunakan AUTO_INCREMENT
         # yang sudah ada di tabel messages
+        # cursor.execute(
+        #     """INSERT INTO messages 
+        #         (chat_id, message, sender, is_correction, corrected_message_id, corrected_by) 
+        #         VALUES (%s, %s, 'bot', TRUE, %s, %s)""",
+        #     (message['chat_id'], correction, message_id, user_id)
+        # )
         cursor.execute(
             """INSERT INTO messages 
                 (chat_id, message, sender, is_correction, corrected_message_id, corrected_by) 
-                VALUES (%s, %s, 'bot', TRUE, %s, %s)""",
+                VALUES (%s, %s, 'bot', TRUE, %s, %s)
+                RETURNING id""",
             (message['chat_id'], correction, message_id, user_id)
         )
         
         # Get the auto-generated ID
-        cursor.execute("SELECT LAST_INSERT_ID()")
+        # cursor.execute("SELECT LAST_INSERT_ID()")
         result = cursor.fetchone()
-        correction_id = result['LAST_INSERT_ID()'] if result else None
+        # correction_id = result['LAST_INSERT_ID()'] if result else None
+        correction_id = result['id'] if result else None
         
         conn.commit()
         
@@ -2354,7 +2366,7 @@ def correct_message(message_id):
         try:
             cursor.execute(
                 "UPDATE chats SET verified = TRUE, verified_at = %s, verified_by = %s WHERE id = %s",
-                (datetime.now(), user_id, message['chat_id'])
+                (now_wib, user_id, message['chat_id'])
             )
             conn.commit()
         except Exception as verify_error:
@@ -2584,7 +2596,7 @@ def test_message():
             "message": "Test message received",
             "your_message": message,
             "response": f"You said: {message}",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": now_wib.isoformat()
         })
     except Exception as e:
         return jsonify({
@@ -2662,7 +2674,7 @@ def quick_create_chat():
         try:
             cursor.execute(
                 "INSERT INTO chats (user_id, created_at) VALUES (%s, %s) RETURNING id",
-                (user_id, datetime.now(),)
+                (user_id, now_wib,)
             )
             chat_id = cursor.fetchone()[0]
             conn.commit()
@@ -2699,7 +2711,7 @@ def frontend_issue_tracker():
     try:
         # Log as much info as possible about the request
         data = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": now_wib.isoformat(),
             "method": request.method,
             "path": request.path,
             "headers": dict(request.headers),
@@ -2833,7 +2845,7 @@ def simple_create_chat():
         try:
             cursor.execute(
                 "INSERT INTO chats (user_id, created_at) VALUES (%s, %s) RETURNING id",
-                (user_id, datetime.now(),)
+                (user_id, now_wib,)
             )
             
             chat_id = cursor.fetchone()[0]
