@@ -1,0 +1,11 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: senadi
+    ports:
+      - "7860:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
